@@ -43,6 +43,7 @@
 void remmina_about_open(GtkWindow* parent)
 {
 	TRACE_CALL("remmina_about_open");
+/*
 	const gchar* authors[] =
 	{
 		N_("Maintainers:"),
@@ -82,11 +83,13 @@ void remmina_about_open(GtkWindow* parent)
 	};
 
 	gchar* license = g_strjoin("\n\n", _(licenses[0]), _(licenses[1]), _(licenses[2]), NULL);
-
+*/
 	GtkBuilder *builder;
 
 	GtkWidget* dialog;
+/*
 	dialog = gtk_about_dialog_new();
+*/
 
 	builder=gtk_builder_new_from_file(REMMINA_UIDIR G_DIR_SEPARATOR_S "remmina_about.glade");
 	dialog=GTK_WIDGET(gtk_builder_get_object(builder, "aboutdialog1"));
@@ -114,6 +117,7 @@ void remmina_about_open(GtkWindow* parent)
 	gtk_window_present(GTK_WINDOW(dialog));
 
 	remmina_widget_pool_register(dialog);
-
+/*
 	g_free(license);
+*/
 }
