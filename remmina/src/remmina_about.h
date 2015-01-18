@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, 
+ * Foundation, Inc., 59 Temple Place, Suite 330,
  * Boston, MA 02111-1307, USA.
  *
  *  In addition, as a special exception, the copyright holders give
@@ -38,7 +38,7 @@
 G_BEGIN_DECLS
 
 GdkPixbuf* remmina_about_get_logo(void);
-void remmina_about_open(GtkWindow *parent);
+void remmina_about_open(GtkAboutDialog *parent);
 
 G_END_DECLS
 
