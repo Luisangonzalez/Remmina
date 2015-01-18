@@ -38,7 +38,7 @@
 G_BEGIN_DECLS
 
 GdkPixbuf* remmina_about_get_logo(void);
-void remmina_about_open(GtkAboutDialog *parent);
+void remmina_about_open(GtkWindow *parent);
 
 G_END_DECLS
 
