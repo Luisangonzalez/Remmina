@@ -83,9 +83,15 @@ void remmina_about_open(GtkWindow* parent)
 
 	gchar* license = g_strjoin("\n\n", _(licenses[0]), _(licenses[1]), _(licenses[2]), NULL);
 
+	GtkBuilder *builder;
+
 	GtkWidget* dialog;
 	dialog = gtk_about_dialog_new();
 
+	builder=gtk_builder_new_from_file(REMMINA_UIDIR G_DIR_SEPARATOR_S "remmina_about.glade");
+	dialog=GTK_WIDGET(gtk_builder_get_object(builder, "aboutdialog1"));
+
+/*
 	gtk_about_dialog_set_program_name(GTK_ABOUT_DIALOG(dialog), "Remmina");
 	gtk_about_dialog_set_version(GTK_ABOUT_DIALOG(dialog), VERSION);
 	gtk_about_dialog_set_copyright(GTK_ABOUT_DIALOG(dialog), "Copyright (C) 2009-2012 Vic Lee");
@@ -97,7 +103,7 @@ void remmina_about_open(GtkWindow* parent)
 	gtk_about_dialog_set_artists(GTK_ABOUT_DIALOG(dialog), artists);
 	gtk_about_dialog_set_translator_credits(GTK_ABOUT_DIALOG(dialog), _("translator-credits"));
 	gtk_about_dialog_set_logo_icon_name(GTK_ABOUT_DIALOG(dialog), "remmina");
-
+*/
 	if (parent)
 	{
 		gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
