@@ -548,3 +548,30 @@ guint remmina_public_get_window_workspace(GtkWindow *gtkwindow)
 #endif
 }
 
+/* Find hardware keycode for the requested keyval */
+guint16 remmina_public_get_keycode_for_keyval(GdkKeymap *keymap, guint keyval)
+{
+	TRACE_CALL("remmina_public_get_keycode_for_keyval")
+	GdkKeymapKey *keys = NULL;
+	gint length = 0;
+	guint16 keycode = 0;
+
+	if (gdk_keymap_get_entries_for_keyval(keymap, keyval, &keys, &length))
+	{
+		keycode = keys[0].keycode;
+		g_free(keys);
+	}
+	return keycode;
+}
+
+/* Check if the requested keycode is a key modifier */
+gboolean remmina_public_get_modifier_for_keycode(GdkKeymap *keymap, guint16 keycode)
+{
+	TRACE_CALL("remmina_public_get_modifier_for_keycode")
+	g_return_val_if_fail(keycode > 0, FALSE);
+#ifdef GDK_WINDOWING_X11
+	return gdk_x11_keymap_key_is_modifier(keymap, keycode);
+#else
+	return FALSE;
+#endif
+}

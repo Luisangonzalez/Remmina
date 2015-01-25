@@ -52,9 +52,10 @@
 #include <freerdp/error.h>
 #include <winpr/memory.h>
 
-#define REMMINA_RDP_FEATURE_TOOL_REFRESH		1
-#define REMMINA_RDP_FEATURE_SCALE			2
-#define REMMINA_RDP_FEATURE_UNFOCUS			3
+#define REMMINA_RDP_FEATURE_TOOL_REFRESH         1
+#define REMMINA_RDP_FEATURE_SCALE                2
+#define REMMINA_RDP_FEATURE_UNFOCUS              3
+#define REMMINA_RDP_FEATURE_TOOL_SENDCTRLALTDEL  4
 
 RemminaPluginService* remmina_plugin_service = NULL;
 static char remmina_rdp_plugin_default_drive_name[]="RemminaDisk";
@@ -62,9 +63,7 @@ static char remmina_rdp_plugin_default_drive_name[]="RemminaDisk";
 void rf_get_fds(RemminaProtocolWidget* gp, void** rfds, int* rcount)
 {
 	TRACE_CALL("rf_get_fds");
-	rfContext* rfi;
-
-	rfi = GET_DATA(gp);
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
 
 	if (rfi->event_pipe[0] != -1)
 	{
@@ -79,10 +78,8 @@ BOOL rf_check_fds(RemminaProtocolWidget* gp)
 	UINT16 flags;
 	gchar buf[100];
 	rdpInput* input;
-	rfContext* rfi;
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
 	RemminaPluginRdpEvent* event;
-
-	rfi = GET_DATA(gp);
 
 	if (rfi->event_queue == NULL)
 		return True;
@@ -118,11 +115,10 @@ BOOL rf_check_fds(RemminaProtocolWidget* gp)
 void rf_queue_ui(RemminaProtocolWidget* gp, RemminaPluginRdpUiObject* ui)
 {
 	TRACE_CALL("rf_queue_ui");
-	rfContext* rfi;
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
 	gboolean ui_sync_save;
 
 	ui_sync_save = ui->sync;
-	rfi = GET_DATA(gp);
 
 	if (ui_sync_save) {
 		pthread_mutex_init(&ui->sync_wait_mutex,NULL);
@@ -146,9 +142,7 @@ void rf_queue_ui(RemminaProtocolWidget* gp, RemminaPluginRdpUiObject* ui)
 void rf_object_free(RemminaProtocolWidget* gp, RemminaPluginRdpUiObject* obj)
 {
 	TRACE_CALL("rf_object_free");
-	rfContext* rfi;
-
-	rfi = GET_DATA(gp);
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
 
 	switch (obj->type)
 	{
@@ -490,14 +484,13 @@ static void remmina_rdp_main_loop(RemminaProtocolWidget* gp)
 	void *wfds[32];
 	fd_set rfds_set;
 	fd_set wfds_set;
-	rfContext* rfi;
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
 
 	rdpChannels *channels;
 
 	memset(rfds, 0, sizeof(rfds));
 	memset(wfds, 0, sizeof(wfds));
 
-	rfi = GET_DATA(gp);
 	channels = rfi->instance->context->channels;
 
 	while (!freerdp_shall_disconnect(rfi->instance))
@@ -613,6 +606,16 @@ int remmina_rdp_add_static_channel(rdpSettings* settings, int count, char** para
 	return 0;
 }
 
+/* Send CTRL+ALT+DEL keys keystrokes to the plugin drawing_area widget */
+static void remmina_rdp_send_ctrlaltdel(RemminaProtocolWidget *gp)
+{
+	TRACE_CALL("remmina_rdp_send_ctrlaltdel");
+	guint keys[] = { GDK_KEY_Control_L, GDK_KEY_Alt_L, GDK_KEY_Delete };
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
+
+	remmina_plugin_service->protocol_plugin_send_keys_signals(rfi->drawing_area,
+		keys, G_N_ELEMENTS(keys), GDK_KEY_PRESS | GDK_KEY_RELEASE);
+}
 
 static gboolean remmina_rdp_main(RemminaProtocolWidget* gp)
 {
@@ -630,15 +633,12 @@ static gboolean remmina_rdp_main(RemminaProtocolWidget* gp)
 	char rdpsnd_param2[16];
 	const gchar* cs;
 	RemminaFile* remminafile;
-	rfContext* rfi;
-
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
 	const gchar *cert_hostport;
 	gchar *cert_host;
 	gint cert_port;
 
-	rfi = GET_DATA(gp);
 	remminafile = remmina_plugin_service->protocol_plugin_get_file(gp);
-
 	s = remmina_plugin_service->protocol_plugin_start_direct_tunnel(gp, 3389, FALSE);
 
 	if (s == NULL)
@@ -935,7 +935,7 @@ static gpointer remmina_rdp_main_thread(gpointer data)
 	CANCEL_ASYNC
 
 	gp = (RemminaProtocolWidget*) data;
-	rfi = GET_DATA(gp);
+	rfi = GET_PLUGIN_DATA(gp);
 	remmina_rdp_main(gp);
 	rfi->thread = 0;
 
@@ -981,10 +981,8 @@ static void remmina_rdp_init(RemminaProtocolWidget* gp)
 static gboolean remmina_rdp_open_connection(RemminaProtocolWidget* gp)
 {
 	TRACE_CALL("remmina_rdp_open_connection");
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
 
-	rfContext* rfi;
-
-	rfi = (rfContext*)GET_DATA(gp);
 	rfi->scale = remmina_plugin_service->protocol_plugin_get_scale(gp);
 
 	if (pthread_create(&rfi->thread, NULL, remmina_rdp_main_thread, gp))
@@ -1003,14 +1001,10 @@ static gboolean remmina_rdp_open_connection(RemminaProtocolWidget* gp)
 static gboolean remmina_rdp_close_connection(RemminaProtocolWidget* gp)
 {
 	TRACE_CALL("remmina_rdp_close_connection");
-	rfContext* rfi;
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
 	freerdp* instance;
 
-
-	rfi = (rfContext*)GET_DATA(gp);
 	instance = rfi->instance;
-
-
 	if (rfi->thread)
 	{
 		rfi->thread_cancelled = TRUE;	// Avoid all rf_queue function to run
@@ -1072,9 +1066,8 @@ static void remmina_rdp_call_feature(RemminaProtocolWidget* gp, const RemminaPro
 {
 	TRACE_CALL("remmina_rdp_call_feature");
 	RemminaFile* remminafile;
-	rfContext* rfi;
+	rfContext* rfi = GET_PLUGIN_DATA(gp);
 
-	rfi = (rfContext*)GET_DATA(gp);
 	remminafile = remmina_plugin_service->protocol_plugin_get_file(gp);
 
 	switch (feature->id)
@@ -1094,11 +1087,16 @@ static void remmina_rdp_call_feature(RemminaProtocolWidget* gp, const RemminaPro
 				remmina_plugin_service->protocol_plugin_get_height(gp));
 			break;
 
+		case REMMINA_RDP_FEATURE_TOOL_SENDCTRLALTDEL:
+			remmina_rdp_send_ctrlaltdel(gp);
+			break;
+
 		default:
 			break;
 	}
 }
 
+/* Array of key/value pairs for color depths */
 static gpointer colordepth_list[] =
 {
 	"8", N_("256 colors (8 bpp)"),
@@ -1110,6 +1108,7 @@ static gpointer colordepth_list[] =
 	NULL
 };
 
+/* Array of key/value pairs for quality selection */
 static gpointer quality_list[] =
 {
 	"0", N_("Poor (fastest)"),
@@ -1119,6 +1118,7 @@ static gpointer quality_list[] =
 	NULL
 };
 
+/* Array of key/value pairs for sound options */
 static gpointer sound_list[] =
 {
 	"off", N_("Off"),
@@ -1130,6 +1130,7 @@ static gpointer sound_list[] =
 	NULL
 };
 
+/* Array of key/value pairs for security */
 static gpointer security_list[] =
 {
 	"", N_("Negotiate"),
@@ -1139,6 +1140,15 @@ static gpointer security_list[] =
 	NULL
 };
 
+/* Array of RemminaProtocolSetting for basic settings.
+ * Each item is composed by:
+ * a) RemminaProtocolSettingType for setting type
+ * b) Setting name
+ * c) Setting description
+ * d) Compact disposition
+ * e) Values for REMMINA_PROTOCOL_SETTING_TYPE_SELECT or REMMINA_PROTOCOL_SETTING_TYPE_COMBO
+ * f) Unused pointer
+ */
 static const RemminaProtocolSetting remmina_rdp_basic_settings[] =
 {
 	{ REMMINA_PROTOCOL_SETTING_TYPE_SERVER, NULL, NULL, FALSE, NULL, NULL },
@@ -1151,6 +1161,15 @@ static const RemminaProtocolSetting remmina_rdp_basic_settings[] =
 	{ REMMINA_PROTOCOL_SETTING_TYPE_END, NULL, NULL, FALSE, NULL, NULL }
 };
 
+/* Array of RemminaProtocolSetting for advanced settings.
+ * Each item is composed by:
+ * a) RemminaProtocolSettingType for setting type
+ * b) Setting name
+ * c) Setting description
+ * d) Compact disposition
+ * e) Values for REMMINA_PROTOCOL_SETTING_TYPE_SELECT or REMMINA_PROTOCOL_SETTING_TYPE_COMBO
+ * f) Unused pointer
+ */
 static const RemminaProtocolSetting remmina_rdp_advanced_settings[] =
 {
 	{ REMMINA_PROTOCOL_SETTING_TYPE_SELECT, "quality", N_("Quality"), FALSE, quality_list, NULL },
@@ -1166,61 +1185,63 @@ static const RemminaProtocolSetting remmina_rdp_advanced_settings[] =
 	{ REMMINA_PROTOCOL_SETTING_TYPE_END, NULL, NULL, FALSE, NULL, NULL }
 };
 
+/* Array for available features.
+ * The last element of the array must be REMMINA_PROTOCOL_FEATURE_TYPE_END. */
 static const RemminaProtocolFeature remmina_rdp_features[] =
 {
 	{ REMMINA_PROTOCOL_FEATURE_TYPE_TOOL, REMMINA_RDP_FEATURE_TOOL_REFRESH, N_("Refresh"), NULL, NULL },
 	{ REMMINA_PROTOCOL_FEATURE_TYPE_SCALE, REMMINA_RDP_FEATURE_SCALE, NULL, NULL, NULL },
+	{ REMMINA_PROTOCOL_FEATURE_TYPE_TOOL, REMMINA_RDP_FEATURE_TOOL_SENDCTRLALTDEL, N_("Send Ctrl+Alt+Delete"), NULL, NULL },
 	{ REMMINA_PROTOCOL_FEATURE_TYPE_UNFOCUS, REMMINA_RDP_FEATURE_UNFOCUS, NULL, NULL, NULL },
 	{ REMMINA_PROTOCOL_FEATURE_TYPE_END, 0, NULL, NULL, NULL }
 };
 
+/* Protocol plugin definition and features */
 static RemminaProtocolPlugin remmina_rdp =
 {
-	REMMINA_PLUGIN_TYPE_PROTOCOL,
-	"RDP",
-	N_("RDP - Remote Desktop Protocol"),
-	GETTEXT_PACKAGE,
-	VERSION,
-
-	"remmina-rdp",
-	"remmina-rdp-ssh",
-	remmina_rdp_basic_settings,
-	remmina_rdp_advanced_settings,
-	REMMINA_PROTOCOL_SSH_SETTING_TUNNEL,
-	remmina_rdp_features,
-
-	remmina_rdp_init,
-	remmina_rdp_open_connection,
-	remmina_rdp_close_connection,
-	remmina_rdp_query_feature,
-	remmina_rdp_call_feature
+	REMMINA_PLUGIN_TYPE_PROTOCOL,                 // Type
+	"RDP",                                        // Name
+	N_("RDP - Remote Desktop Protocol"),          // Description
+	GETTEXT_PACKAGE,                              // Translation domain
+	VERSION,                                      // Version number
+	"remmina-rdp",                                // Icon for normal connection
+	"remmina-rdp-ssh",                            // Icon for SSH connection
+	remmina_rdp_basic_settings,                   // Array for basic settings
+	remmina_rdp_advanced_settings,                // Array for advanced settings
+	REMMINA_PROTOCOL_SSH_SETTING_TUNNEL,          // SSH settings type
+	remmina_rdp_features,                         // Array for available features
+	remmina_rdp_init,                             // Plugin initialization
+	remmina_rdp_open_connection,                  // Plugin open connection
+	remmina_rdp_close_connection,                 // Plugin close connection
+	remmina_rdp_query_feature,                    // Query for available features
+	remmina_rdp_call_feature                      // Call a feature
 };
 
+/* File plugin definition and features */
 static RemminaFilePlugin remmina_rdpf =
 {
-	REMMINA_PLUGIN_TYPE_FILE,
-	"RDPF",
-	N_("RDP - RDP File Handler"),
-	GETTEXT_PACKAGE,
-	VERSION,
-
-	remmina_rdp_file_import_test,
-	remmina_rdp_file_import,
-	remmina_rdp_file_export_test,
-	remmina_rdp_file_export,
+	REMMINA_PLUGIN_TYPE_FILE,                     // Type
+	"RDPF",                                       // Name
+	N_("RDP - RDP File Handler"),                 // Description
+	GETTEXT_PACKAGE,                              // Translation domain
+	VERSION,                                      // Version number
+	remmina_rdp_file_import_test,                 // Test import function
+	remmina_rdp_file_import,                      // Import function
+	remmina_rdp_file_export_test,                 // Test export function
+	remmina_rdp_file_export,                      // Export function
 	NULL
 };
 
+/* Preferences plugin definition and features */
 static RemminaPrefPlugin remmina_rdps =
 {
-	REMMINA_PLUGIN_TYPE_PREF,
-	"RDPS",
-	N_("RDP - Preferences"),
-	GETTEXT_PACKAGE,
-	VERSION,
-
-	"RDP",
-	remmina_rdp_settings_new
+	REMMINA_PLUGIN_TYPE_PREF,                     // Type
+	"RDPS",                                       // Name
+	N_("RDP - Preferences"),                      // Description
+	GETTEXT_PACKAGE,                              // Translation domain
+	VERSION,                                      // Version number
+	"RDP",                                        // Label
+	remmina_rdp_settings_new                      // Preferences body function
 };
 
 G_MODULE_EXPORT gboolean remmina_plugin_entry(RemminaPluginService* service)

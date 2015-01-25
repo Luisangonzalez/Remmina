@@ -46,10 +46,12 @@
 #include "remmina_sftp_plugin.h"
 #include "remmina/remmina_trace_calls.h"
 
-#define REMMINA_PLUGIN_SFTP_FEATURE_PREF_SHOW_HIDDEN 1
+#define REMMINA_PLUGIN_SFTP_FEATURE_PREF_SHOW_HIDDEN   1
 #define REMMINA_PLUGIN_SFTP_FEATURE_PREF_OVERWRITE_ALL 2
 
 #define REMMINA_PLUGIN_SFTP_FEATURE_PREF_OVERWRITE_ALL_KEY "overwrite_all"
+
+#define GET_PLUGIN_DATA(gp) (RemminaPluginSftpData*) g_object_get_data(G_OBJECT(gp), "plugin-data");
 
 typedef struct _RemminaPluginSftpData
 {
@@ -76,7 +78,7 @@ remmina_plugin_sftp_main_thread (gpointer data)
 	pthread_setcancelstate (PTHREAD_CANCEL_ENABLE, NULL);
 	CANCEL_ASYNC
 
-	gpdata = (RemminaPluginSftpData*) g_object_get_data (G_OBJECT(gp), "plugin-data");
+	gpdata = GET_PLUGIN_DATA(gp);
 
 	ssh = g_object_get_data (G_OBJECT(gp), "user-data");
 	if (ssh)
@@ -190,9 +192,7 @@ static gboolean
 remmina_plugin_sftp_open_connection (RemminaProtocolWidget *gp)
 {
 	TRACE_CALL("remmina_plugin_sftp_open_connection");
-	RemminaPluginSftpData *gpdata;
-
-	gpdata = (RemminaPluginSftpData*) g_object_get_data (G_OBJECT(gp), "plugin-data");
+	RemminaPluginSftpData *gpdata = GET_PLUGIN_DATA(gp);
 
 	remmina_plugin_service->protocol_plugin_set_expand (gp, TRUE);
 	remmina_plugin_service->protocol_plugin_set_width (gp, 640);
@@ -216,10 +216,9 @@ static gboolean
 remmina_plugin_sftp_close_connection (RemminaProtocolWidget *gp)
 {
 	TRACE_CALL("remmina_plugin_sftp_close_connection");
-	RemminaPluginSftpData *gpdata;
+	RemminaPluginSftpData *gpdata = GET_PLUGIN_DATA(gp);
 	RemminaFile *remminafile;
 
-	gpdata = (RemminaPluginSftpData*) g_object_get_data (G_OBJECT(gp), "plugin-data");
 	remminafile = remmina_plugin_service->protocol_plugin_get_file (gp);
 	if (gpdata->thread)
 	{
@@ -248,10 +247,9 @@ static void
 remmina_plugin_sftp_call_feature (RemminaProtocolWidget *gp, const RemminaProtocolFeature *feature)
 {
 	TRACE_CALL("remmina_plugin_sftp_call_feature");
-	RemminaPluginSftpData *gpdata;
+	RemminaPluginSftpData *gpdata = GET_PLUGIN_DATA(gp);
 	RemminaFile *remminafile;
 
-	gpdata = (RemminaPluginSftpData*) g_object_get_data (G_OBJECT(gp), "plugin-data");
 	remminafile = remmina_plugin_service->protocol_plugin_get_file (gp);
 	switch (feature->id)
 	{
@@ -277,36 +275,34 @@ remmina_plugin_sftp_call_feature (RemminaProtocolWidget *gp, const RemminaProtoc
 	}
 }
 
+/* Array for available features.
+ * The last element of the array must be REMMINA_PROTOCOL_FEATURE_TYPE_END. */
 static const RemminaProtocolFeature remmina_plugin_sftp_features[] =
 {
-	{	REMMINA_PROTOCOL_FEATURE_TYPE_PREF, REMMINA_PLUGIN_SFTP_FEATURE_PREF_SHOW_HIDDEN,
-		GINT_TO_POINTER (REMMINA_PROTOCOL_FEATURE_PREF_CHECK), "showhidden", N_("Show Hidden Files")},
-	{	REMMINA_PROTOCOL_FEATURE_TYPE_PREF, REMMINA_PLUGIN_SFTP_FEATURE_PREF_OVERWRITE_ALL,
-		GINT_TO_POINTER (REMMINA_PROTOCOL_FEATURE_PREF_CHECK), 
-		REMMINA_PLUGIN_SFTP_FEATURE_PREF_OVERWRITE_ALL_KEY, N_("Overwrite all")},
-	{	REMMINA_PROTOCOL_FEATURE_TYPE_END, 0, NULL, NULL, NULL}
+	{ REMMINA_PROTOCOL_FEATURE_TYPE_PREF, REMMINA_PLUGIN_SFTP_FEATURE_PREF_SHOW_HIDDEN, GINT_TO_POINTER(REMMINA_PROTOCOL_FEATURE_PREF_CHECK), "showhidden", N_("Show Hidden Files") },
+	{ REMMINA_PROTOCOL_FEATURE_TYPE_PREF, REMMINA_PLUGIN_SFTP_FEATURE_PREF_OVERWRITE_ALL, GINT_TO_POINTER(REMMINA_PROTOCOL_FEATURE_PREF_CHECK), REMMINA_PLUGIN_SFTP_FEATURE_PREF_OVERWRITE_ALL_KEY, N_("Overwrite all") },
+	{ REMMINA_PROTOCOL_FEATURE_TYPE_END, 0, NULL, NULL, NULL }
 };
 
+/* Protocol plugin definition and features */
 static RemminaProtocolPlugin remmina_plugin_sftp =
 {
-	REMMINA_PLUGIN_TYPE_PROTOCOL,
-	"SFTP",
-	N_("SFTP - Secure File Transfer"),
-	GETTEXT_PACKAGE,
-	VERSION,
-
-	"remmina-sftp",
-	"remmina-sftp",
-	NULL,
-	NULL,
-	REMMINA_PROTOCOL_SSH_SETTING_SFTP,
-	remmina_plugin_sftp_features,
-
-	remmina_plugin_sftp_init,
-	remmina_plugin_sftp_open_connection,
-	remmina_plugin_sftp_close_connection,
-	remmina_plugin_sftp_query_feature,
-	remmina_plugin_sftp_call_feature
+	REMMINA_PLUGIN_TYPE_PROTOCOL,                 // Type
+	"SFTP",                                       // Name
+	N_("SFTP - Secure File Transfer"),            // Description
+	GETTEXT_PACKAGE,                              // Translation domain
+	VERSION,                                      // Version number
+	"remmina-sftp",                               // Icon for normal connection
+	"remmina-sftp",                               // Icon for SSH connection
+	NULL,                                         // Array for basic settings
+	NULL,                                         // Array for advanced settings
+	REMMINA_PROTOCOL_SSH_SETTING_SFTP,            // SSH settings type
+	remmina_plugin_sftp_features,                 // Array for available features
+	remmina_plugin_sftp_init,                     // Plugin initialization
+	remmina_plugin_sftp_open_connection,          // Plugin open connection
+	remmina_plugin_sftp_close_connection,         // Plugin close connection
+	remmina_plugin_sftp_query_feature,            // Query for available features
+	remmina_plugin_sftp_call_feature              // Call a feature
 };
 
 void

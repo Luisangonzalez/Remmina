@@ -83,6 +83,10 @@ gint remmina_public_open_xdisplay(const gchar *disp);
 guint remmina_public_get_current_workspace(GdkScreen *screen);
 guint remmina_public_get_window_workspace(GtkWindow *gtkwindow);
 
+/* Find hardware keycode for the requested keyval */
+guint16 remmina_public_get_keycode_for_keyval(GdkKeymap *keymap, guint keyval);
+/* Check if the requested keycode is a key modifier */
+gboolean remmina_public_get_modifier_for_keycode(GdkKeymap *keymap, guint16 keycode);
 
 #endif  /* __REMMINAPUBLIC_H__  */
 

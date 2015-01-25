@@ -39,6 +39,10 @@
 
 INCLUDE_GET_AVAILABLE_XDISPLAY
 
+#define REMMINA_PLUGIN_XDMCP_FEATURE_TOOL_SENDCTRLALTDEL 1
+
+#define GET_PLUGIN_DATA(gp) (RemminaPluginXdmcpData*) g_object_get_data(G_OBJECT(gp), "plugin-data");
+
 typedef struct _RemminaPluginXdmcpData
 {
 	GtkWidget *socket;
@@ -58,9 +62,7 @@ static RemminaPluginService *remmina_plugin_service = NULL;
 static void remmina_plugin_xdmcp_on_plug_added(GtkSocket *socket, RemminaProtocolWidget *gp)
 {
 	TRACE_CALL("remmina_plugin_xdmcp_on_plug_added");
-	RemminaPluginXdmcpData *gpdata;
-
-	gpdata = (RemminaPluginXdmcpData*) g_object_get_data(G_OBJECT(gp), "plugin-data");
+	RemminaPluginXdmcpData *gpdata = GET_PLUGIN_DATA(gp);
 
 	remmina_plugin_service->protocol_plugin_emit_signal(gp, "connect");
 	gpdata->ready = TRUE;
@@ -75,7 +77,7 @@ static void remmina_plugin_xdmcp_on_plug_removed(GtkSocket *socket, RemminaProto
 static gboolean remmina_plugin_xdmcp_start_xephyr(RemminaProtocolWidget *gp)
 {
 	TRACE_CALL("remmina_plugin_xdmcp_start_xephyr");
-	RemminaPluginXdmcpData *gpdata;
+	RemminaPluginXdmcpData *gpdata = GET_PLUGIN_DATA(gp);
 	RemminaFile *remminafile;
 	gchar *argv[50];
 	gint argc;
@@ -84,7 +86,6 @@ static gboolean remmina_plugin_xdmcp_start_xephyr(RemminaProtocolWidget *gp)
 	GError *error = NULL;
 	gboolean ret;
 
-	gpdata = (RemminaPluginXdmcpData*) g_object_get_data(G_OBJECT(gp), "plugin-data");
 	remminafile = remmina_plugin_service->protocol_plugin_get_file(gp);
 
 	gpdata->display = remmina_get_available_xdisplay();
@@ -175,10 +176,9 @@ static gboolean remmina_plugin_xdmcp_tunnel_init_callback(RemminaProtocolWidget 
 		gint port)
 {
 	TRACE_CALL("remmina_plugin_xdmcp_tunnel_init_callback");
-	RemminaPluginXdmcpData *gpdata;
+	RemminaPluginXdmcpData *gpdata = GET_PLUGIN_DATA(gp);
 	RemminaFile *remminafile;
 
-	gpdata = (RemminaPluginXdmcpData*) g_object_get_data(G_OBJECT(gp), "plugin-data");
 	remminafile = remmina_plugin_service->protocol_plugin_get_file(gp);
 
 	if (!remmina_plugin_xdmcp_start_xephyr(gp))
@@ -203,10 +203,9 @@ static gboolean remmina_plugin_xdmcp_tunnel_init_callback(RemminaProtocolWidget 
 static gboolean remmina_plugin_xdmcp_main(RemminaProtocolWidget *gp)
 {
 	TRACE_CALL("remmina_plugin_xdmcp_main");
-	RemminaPluginXdmcpData *gpdata;
+	RemminaPluginXdmcpData *gpdata = GET_PLUGIN_DATA(gp);
 	RemminaFile *remminafile;
 
-	gpdata = (RemminaPluginXdmcpData*) g_object_get_data(G_OBJECT(gp), "plugin-data");
 	remminafile = remmina_plugin_service->protocol_plugin_get_file(gp);
 
 	if (remmina_plugin_service->file_get_int(remminafile, "ssh_enabled", FALSE))
@@ -265,11 +264,10 @@ static void remmina_plugin_xdmcp_init(RemminaProtocolWidget *gp)
 static gboolean remmina_plugin_xdmcp_open_connection(RemminaProtocolWidget *gp)
 {
 	TRACE_CALL("remmina_plugin_xdmcp_open_connection");
-	RemminaPluginXdmcpData *gpdata;
+	RemminaPluginXdmcpData *gpdata = GET_PLUGIN_DATA(gp);
 	RemminaFile *remminafile;
 	gint width, height;
 
-	gpdata = (RemminaPluginXdmcpData*) g_object_get_data(G_OBJECT(gp), "plugin-data");
 	remminafile = remmina_plugin_service->protocol_plugin_get_file(gp);
 
 	width = remmina_plugin_service->file_get_int(remminafile, "resolution_width", 640);
@@ -305,10 +303,7 @@ static gboolean remmina_plugin_xdmcp_open_connection(RemminaProtocolWidget *gp)
 static gboolean remmina_plugin_xdmcp_close_connection(RemminaProtocolWidget *gp)
 {
 	TRACE_CALL("remmina_plugin_xdmcp_close_connection");
-	RemminaPluginXdmcpData *gpdata;
-
-	gpdata = (RemminaPluginXdmcpData*) g_object_get_data(G_OBJECT(gp), "plugin-data");
-
+	RemminaPluginXdmcpData *gpdata = GET_PLUGIN_DATA(gp);
 
 	if (gpdata->thread)
 	{
@@ -328,38 +323,98 @@ static gboolean remmina_plugin_xdmcp_close_connection(RemminaProtocolWidget *gp)
 	return FALSE;
 }
 
+/* Send CTRL+ALT+DEL keys keystrokes to the plugin socket widget */
+static void remmina_plugin_xdmcp_send_ctrlaltdel(RemminaProtocolWidget *gp)
+{
+	TRACE_CALL("remmina_plugin_xdmcp_send_ctrlaltdel");
+	guint keys[] = { GDK_KEY_Control_L, GDK_KEY_Alt_L, GDK_KEY_Delete };
+	RemminaPluginXdmcpData *gpdata = GET_PLUGIN_DATA(gp);
+
+	remmina_plugin_service->protocol_plugin_send_keys_signals(gpdata->socket,
+		keys, G_N_ELEMENTS(keys), GDK_KEY_PRESS | GDK_KEY_RELEASE);
+}
+
 static gboolean remmina_plugin_xdmcp_query_feature(RemminaProtocolWidget *gp, const RemminaProtocolFeature *feature)
 {
 	TRACE_CALL("remmina_plugin_xdmcp_query_feature");
-	return FALSE;
+	return TRUE;
 }
 
 static void remmina_plugin_xdmcp_call_feature(RemminaProtocolWidget *gp, const RemminaProtocolFeature *feature)
 {
 	TRACE_CALL("remmina_plugin_xdmcp_call_feature");
+	RemminaFile *remminafile;
+
+	remminafile = remmina_plugin_service->protocol_plugin_get_file(gp);
+	switch (feature->id)
+	{
+		case REMMINA_PLUGIN_XDMCP_FEATURE_TOOL_SENDCTRLALTDEL:
+			remmina_plugin_xdmcp_send_ctrlaltdel(gp);
+			break;
+		default:
+			break;
+	}
 }
 
+/* Array of key/value pairs for color depths */
 static gpointer colordepth_list[] =
-{ "0", N_("Default"), "2", N_("Grayscale"), "8", N_("256 colors"), "16", N_("High color (16 bit)"), "24", N_(
-		"True color (24 bit)"), NULL };
+{
+	"0", N_("Default"),
+	"2", N_("Grayscale"),
+	"8", N_("256 colors"),
+	"16", N_("High color (16 bit)"),
+	"24", N_("True color (24 bit)"),
+	NULL
+};
 
+/* Array of RemminaProtocolSetting for basic settings.
+ * Each item is composed by:
+ * a) RemminaProtocolSettingType for setting type
+ * b) Setting name
+ * c) Setting description
+ * d) Compact disposition
+ * e) Values for REMMINA_PROTOCOL_SETTING_TYPE_SELECT or REMMINA_PROTOCOL_SETTING_TYPE_COMBO
+ * f) Unused pointer
+ */
 static const RemminaProtocolSetting remmina_plugin_xdmcp_basic_settings[] =
 {
-{ REMMINA_PROTOCOL_SETTING_TYPE_SERVER, NULL, NULL, FALSE, NULL, NULL },
-{ REMMINA_PROTOCOL_SETTING_TYPE_RESOLUTION, NULL, NULL, FALSE, NULL, NULL },
-{ REMMINA_PROTOCOL_SETTING_TYPE_SELECT, "colordepth", N_("Color depth"), FALSE, colordepth_list, NULL },
-{ REMMINA_PROTOCOL_SETTING_TYPE_TEXT, "exec", N_("Startup program"), FALSE, NULL, NULL },
-{ REMMINA_PROTOCOL_SETTING_TYPE_CHECK, "showcursor", N_("Use local cursor"), FALSE, NULL, NULL },
-{ REMMINA_PROTOCOL_SETTING_TYPE_CHECK, "once", N_("Disconnect after one session"), FALSE, NULL, NULL },
-{ REMMINA_PROTOCOL_SETTING_TYPE_END, NULL, NULL, FALSE, NULL, NULL } };
+	{ REMMINA_PROTOCOL_SETTING_TYPE_SERVER, NULL, NULL, FALSE, NULL, NULL },
+	{ REMMINA_PROTOCOL_SETTING_TYPE_RESOLUTION, NULL, NULL, FALSE, NULL, NULL },
+	{ REMMINA_PROTOCOL_SETTING_TYPE_SELECT, "colordepth", N_("Color depth"), FALSE, colordepth_list, NULL },
+	{ REMMINA_PROTOCOL_SETTING_TYPE_TEXT, "exec", N_("Startup program"), FALSE, NULL, NULL },
+	{ REMMINA_PROTOCOL_SETTING_TYPE_CHECK, "showcursor", N_("Use local cursor"), FALSE, NULL, NULL },
+	{ REMMINA_PROTOCOL_SETTING_TYPE_CHECK, "once", N_("Disconnect after one session"), FALSE, NULL, NULL },
+	{ REMMINA_PROTOCOL_SETTING_TYPE_END, NULL, NULL, FALSE, NULL, NULL }
+};
 
+/* Array for available features.
+ * The last element of the array must be REMMINA_PROTOCOL_FEATURE_TYPE_END. */
+static const RemminaProtocolFeature remmina_plugin_xdmcp_features[] =
+{
+	{ REMMINA_PROTOCOL_FEATURE_TYPE_TOOL, REMMINA_PLUGIN_XDMCP_FEATURE_TOOL_SENDCTRLALTDEL, N_("Send Ctrl+Alt+Delete"), NULL, NULL },
+	{ REMMINA_PROTOCOL_FEATURE_TYPE_END, 0, NULL, NULL, NULL }
+};
+
+/* Protocol plugin definition and features */
 static RemminaProtocolPlugin remmina_plugin_xdmcp =
-{ REMMINA_PLUGIN_TYPE_PROTOCOL, "XDMCP", N_("XDMCP - X Remote Session"), GETTEXT_PACKAGE, VERSION,
-
-"remmina-xdmcp", "remmina-xdmcp-ssh", remmina_plugin_xdmcp_basic_settings, NULL, REMMINA_PROTOCOL_SSH_SETTING_TUNNEL, NULL,
-
-remmina_plugin_xdmcp_init, remmina_plugin_xdmcp_open_connection, remmina_plugin_xdmcp_close_connection,
-		remmina_plugin_xdmcp_query_feature, remmina_plugin_xdmcp_call_feature };
+{
+	REMMINA_PLUGIN_TYPE_PROTOCOL,                 // Type
+	"XDMCP",                                      // Name
+	N_("XDMCP - X Remote Session"),               // Description
+	GETTEXT_PACKAGE,                              // Translation domain
+	VERSION,                                      // Version number
+	"remmina-xdmcp",                              // Icon for normal connection
+	"remmina-xdmcp-ssh",                          // Icon for SSH connection
+	remmina_plugin_xdmcp_basic_settings,          // Array for basic settings
+	NULL,                                         // Array for advanced settings
+	REMMINA_PROTOCOL_SSH_SETTING_TUNNEL,          // SSH settings type
+	remmina_plugin_xdmcp_features,                // Array for available features
+	remmina_plugin_xdmcp_init,                    // Plugin initialization
+	remmina_plugin_xdmcp_open_connection,         // Plugin open connection
+	remmina_plugin_xdmcp_close_connection,        // Plugin close connection
+	remmina_plugin_xdmcp_query_feature,           // Query for available features
+	remmina_plugin_xdmcp_call_feature             // Call a feature
+};
 
 G_MODULE_EXPORT gboolean
 remmina_plugin_entry(RemminaPluginService *service)
